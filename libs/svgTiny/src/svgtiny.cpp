@@ -14,7 +14,7 @@
 #include <string.h>
 //#include <libxml/parser.h>
 //#include <libxml/debugXML.h>
-#include "tinyxml.h"
+//#include "tinyxml.h"
 #include "svgtiny.h"
 #include "svgtiny_internal.h"
 #include "ofMain.h"
@@ -122,7 +122,53 @@ svgtiny_code svgtiny_parse(svgInfo &info,struct svgtiny_diagram *diagram, const 
 	state.document = document;
 	state.viewport_width = viewport_width;
 	state.viewport_height = viewport_height;
-	svgtiny_parse_position_attributes(svg, state, &x, &y, &width, &height);
+    
+       
+    //store root svg info
+    
+    info.width = ofToString(svg->getAttribute("width").c_str());
+    info.height = ofToString(svg->getAttribute("height").c_str());
+    info.x = ofToString(svg->getAttribute("x").c_str());
+    info.y = ofToString(svg->getAttribute("y").c_str());
+    info.viewbox = ofToString(svg->getAttribute("viewBox").c_str());
+    info.id = ofToString(svg->getAttribute("id").c_str());
+    info.xmlns = ofToString(svg->getAttribute("xmlns").c_str());
+    info.version = ofToString(svg->getAttribute("version").c_str());
+    info.preserveAspectRatio = ofToString(svg->getAttribute("preserveAspectRatio").c_str());
+    
+
+
+        //illustrator check
+    
+    if(!(ofToInt(info.width) > 0) && info.viewbox != ""){
+        vector<string> dims = ofSplitString(info.viewbox," ");
+        
+        if(dims.size()==4){
+            //guess we got lucky
+            //eg.  viewBox="0 0 5000 5000"
+
+            info.x = dims[0];
+            info.y = dims[1];
+            info.width = dims[2];
+            info.height = dims[3];
+            diagram->width = ofToInt(dims[2]);;
+            diagram->height = ofToInt(dims[3]);
+            
+            state.viewport_width = width = diagram->width ;
+            state.viewport_height = height = diagram->height;
+
+            ofLogError()<<"Fixing Illustrator missing width/height "<<info.width<<" "<<info.height<<"\n";
+
+        }else{
+            ofLogError()<<"Failed to fix Illustrator missing width/height. Also missing viewBox.\n";
+        }
+    
+   
+    }
+    
+    svgtiny_parse_position_attributes(svg, state, &x, &y, &width, &height);
+    
+    
 	diagram->width = width;
 	diagram->height = height;
 
@@ -152,20 +198,9 @@ svgtiny_code svgtiny_parse(svgInfo &info,struct svgtiny_diagram *diagram, const 
     rootnode->type = SVG_TAG_TYPE_DOCUMENT;
     info.rootnode = rootnode;
         
-        
-        
-        //store root svg info
-        
-        info.width = ofToString(svg->getAttribute("width").c_str());
-        info.height = ofToString(svg->getAttribute("height").c_str());
-        info.x = ofToString(svg->getAttribute("x").c_str());
-        info.y = ofToString(svg->getAttribute("y").c_str());
-        info.viewbox = ofToString(svg->getAttribute("viewBox").c_str());
-        info.id = ofToString(svg->getAttribute("id").c_str());
-        info.xmlns = ofToString(svg->getAttribute("xmlns").c_str());
-        info.version = ofToString(svg->getAttribute("version").c_str());
-        info.preserveAspectRatio = ofToString(svg->getAttribute("preserveAspectRatio").c_str());
-               
+    
+     
+
         
 	code = svgtiny_parse_svg(info,svg, state,rootnode);
 
@@ -193,7 +228,7 @@ svgtiny_code svgtiny_parse_svg(svgInfo &info,Poco::XML::Element *svg,
 		struct svgtiny_parse_state state, ofPtr<svgNode> currnode){
 	float x, y, width, height;
 	Poco::XML::Attr *view_box;
-	Poco::XML::Element *child;
+	//Poco::XML::Element *child;
 
 	svgtiny_parse_position_attributes(svg, state, &x, &y, &width, &height);
 	svgtiny_parse_paint_attributes(svg, &state);
@@ -425,6 +460,31 @@ svgtiny_code processChildren(svgInfo &info, ofPtr<svgNode> node, Poco::XML::Chil
             
             code = svgtiny_parse_rect(child, state);
         }else if (strcmp(name, "circle") == 0){
+            svgCircleDef pDef;
+            
+            pDef.fill = ofToString(child->getAttribute("fill").c_str());
+            pDef.stroke = ofToString(child->getAttribute("stroke").c_str());
+            pDef.stroke_width = ofToString(child->getAttribute("stroke-width").c_str());
+           
+            pDef.fill_opacity = ofToString(child->getAttribute("fill-opacity").c_str());
+            pDef.stroke_opacity = ofToString(child->getAttribute("stroke-opacity").c_str());
+            
+            pDef.cx = ofToString(child->getAttribute("cx").c_str());
+            pDef.cy = ofToString(child->getAttribute("cy").c_str());
+            pDef.r = ofToString(child->getAttribute("r").c_str());
+            
+            childnode->circle = pDef;
+            childnode->type = SVG_TAG_TYPE_CIRCLE;
+            node->children.push_back(childnode);
+            
+            // ofLog()<<"defining currNode"<<endl;
+            state.currNode = childnode;
+            
+            
+            
+            
+            
+            
             code = svgtiny_parse_circle(child, state);
         }else if (strcmp(name, "ellipse") == 0){
             code = svgtiny_parse_ellipse(child, state);
@@ -761,7 +821,7 @@ svgtiny_code svgtiny_parse_circle(Poco::XML::Element *circle,
 	float x = 0, y = 0, r = -1;
 	float *p;
 	//xmlAttr *attr;
-    Poco::XML::Attr *attr;
+    //Poco::XML::Attr *attr;
 
 	//for (attr = circle->properties; attr; attr = attr->next) {
     //for( attr = circle->FirstAttribute(); attr; attr = attr->Next() ) {
@@ -851,7 +911,7 @@ svgtiny_code svgtiny_parse_ellipse(Poco::XML::Element *ellipse,
 {
 	float x = 0, y = 0, rx = -1, ry = -1;
 	float *p;
-	Poco::XML::Attr *attr;
+	//Poco::XML::Attr *attr;
 
 	//for (attr = ellipse->properties; attr; attr = attr->next) {
     //for( attr = ellipse->FirstAttribute(); attr; attr = attr->Next() ) {
@@ -944,7 +1004,7 @@ svgtiny_code svgtiny_parse_line(Poco::XML::Element *line,
 	float x1 = 0, y1 = 0, x2 = 0, y2 = 0;
 	float *p;
 	//xmlAttr *attr;
-    Poco::XML::Attr *attr;
+    //Poco::XML::Attr *attr;
 
 	//for (attr = line->properties; attr; attr = attr->next) {
     //for( attr = line->FirstAttribute(); attr; attr = attr->Next() ) {
@@ -1120,8 +1180,10 @@ svgtiny_code svgtiny_parse_text(Poco::XML::Element *text,
     
         pNode = it.nextNode();
 
-		if (!code != svgtiny_OK)
+        //borg was if (!code != svgtiny_OK)
+        if (code != svgtiny_OK){
 			return code;
+        }
 	}
 
 	return svgtiny_OK;
@@ -1137,7 +1199,7 @@ void svgtiny_parse_position_attributes(const Poco::XML::Element *node,
 		float *x, float *y, float *width, float *height)
 {
 	//xmlAttr *attr;
-    const Poco::XML::Attr *attr;
+    //const Poco::XML::Attr *attr;
 
 	*x = 0;
 	*y = 0;
@@ -1355,7 +1417,7 @@ void svgtiny_parse_font_attributes(const Poco::XML::Element *node,
 		struct svgtiny_parse_state *state)
 {
 	//const xmlAttr *attr;
-    const Poco::XML::Attr *attr;
+    //const Poco::XML::Attr *attr;
 
 	UNUSED(state);
 
