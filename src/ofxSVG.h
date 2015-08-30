@@ -11,7 +11,6 @@
  
  
  
- TODO: There seems to be an issue with a flickeing blue stroke appearing sometimes. Dunnot what that is.
  
  Andreas Borg
  crea.tion.to
@@ -49,7 +48,13 @@
 #include "ofxSVGTypes.h"
 
 
+//#include "ofxClipper.h"
+
+
 using namespace Poco::XML;
+
+
+
 
 class ofxSVG {
 	public: 
@@ -100,56 +105,60 @@ class ofxSVG {
     
     
     
-    //Functions to build new SVGs
-   /* Element * xmlGetSVG();//the main svg node
-    void xmlSetSVG(Element * xml);
-    Element * xmlGetBody();
-    void xmlSetBody(Element * xml);
-
-    void xmlSetPath(int i, Element * xml);
+        //Functions to build new SVGs
+        //reparse is required to update doc after changes, but when adding many
+        //paths better to do after all is said and done
+        void addPath(ofPath &path,bool inNewGroup=false);
+        void addPaths(vector<ofPath> &paths,bool inNewGroup=false);
     
-    
-    //utility to create new complex svg
-    void xmlBeginGroup();
-    void xmlEndGroup();
-    int xmlGetGroupNum();
-    void xmlAddPathToGroup(int group, Element * xml);
-    Element * xmlGetPathFromGroup(int group,int path);
-    
-    
-    
-    int xmlGetSVGNum();
-    void xmlNestSVG(Element * xml);//you can nest one svg node inside another
-    
-    //convert a path to xml element
-    //static Element * xmlGetPathAsXML(vector<ofPoint>,ofColor fill, ofColor stroke,float strokeWidth);
-    */
     
         void merge(ofxSVG & svg);//add to current
         void save(string file);
         string toString();//return the whole svg as a xml document string..have fun
 
     
-    //Poco::XML::Document *svgDocument;
+
     
         svgInfo info;
         typedef ofPtr <ofPath> ofPathRef;//note this! Shorthand for paths as ofPtrs
         vector <ofPathRef> paths;
         void parseXML(string xml);
         
-    //use when creasting new ofxSVG
+    //use when creating new ofxSVG
    
         void setSize(int w, int h, string unit="px");
+        void setPos(ofPoint pt);
         void setPos(int x, int y);
         int getX();
         int getY();
         int getWidth();
         int getHeight();
         void setViewbox(int x, int y,int w, int h);
-
+    
+    
+        //return as ofImage
+        ofImage getImage(int MSAA = 1);
+        ofImage getImage(int w, int h,ofColor bg, int MSAA = 1);
+    
+    //ofPath:tesselator crashes when too many commands, test for more than 10000
+    void setComplexityThreshold(int i){
+        complexityThreshold = i;
+    }
+    int getComplexityThreshold(){
+        return complexityThreshold;
+    }
+    /*
+    //logical operations
+    ofPtr <vector <ofPolyline> > logicalIntersection(ofxSVG & svg);
+    ofPtr <vector <ofPolyline> > logicalDifference(ofxSVG & svg);
+    ofPtr <vector <ofPolyline> > logicalUnion(ofxSVG & svg);
+    ofPtr <vector <ofPolyline> > logicalXor(ofxSVG & svg);
+    */
     
 	private:
-        
+    
+        int complexityThreshold;//to avoid tesselator crash
+    
         void parseHeader(Document *);
         void xmlCreateSVG(Document *,Element *,ofPtr<svgNode> );
         Element * parseNode(Document *doc,ofPtr<svgNode> );
@@ -168,9 +177,19 @@ class ofxSVG {
 
 		void setupDiagram(struct svgtiny_diagram * diagram);
 		void setupShape(struct svgtiny_shape * shape);
-
+    
+    
+    Element *parsePath(ofPath path,Document * document);
+    /*
+    ofxClipper clipper;
+    ofxPolylines clipMasks;
+    ofxPolylines clipSubjects;
+    ofxPolylines clips;
+    ofxPolylines offsets;
+    void generateClipper(ofxSVG* src,ofxSVG * clip);
+*/
 };
 
 
-
 typedef ofPtr <ofxSVG> ofxSVGRef;
+typedef ofPtr <vector <ofPolyline> > ofPolylinesRef;

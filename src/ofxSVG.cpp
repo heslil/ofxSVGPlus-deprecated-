@@ -14,7 +14,12 @@ ofxSVG::ofxSVG(){
     info.rootnode = rootnode;
     x=0;
     y=0;
-   
+    
+    //set default values
+    setViewbox(0,0,100,100);
+    //this is important on iOS...maybe higher on OSX
+    setComplexityThreshold(5000);
+    
 };
 ofxSVG::~ofxSVG(){
 	paths.clear();
@@ -37,22 +42,25 @@ ofPath & ofxSVG::getPathAt(int n){
 
 void ofxSVG::load(string path){
 	path = ofToDataPath(path);
-
+    
 	if(path.compare("") == 0){
 		stringstream ss;
 		ss << path << " does not exist " << endl;
 		ofLog(OF_LOG_ERROR, ss.str());
 		return;
 	}
-
+    
 	ofBuffer buffer = ofBufferFromFile(path);
 	//size_t size = buffer.size();
-
+    
     parseXML(buffer.getText());
     
     
-   // ofLog()<<"paths size "<<info.rootnode->type<<" getNumPath "<<getNumPath()<<" " <<paths.size()<<endl;
-
+    
+    
+    
+    // ofLog()<<"paths size "<<info.rootnode->type<<" getNumPath "<<getNumPath()<<" " <<paths.size()<<endl;
+    
 }
 
 
@@ -60,7 +68,7 @@ void ofxSVG::parseXML(string xml){
     
     
     if( info.rootnode){
-         info.rootnode.reset();
+        info.rootnode.reset();
     }
     
     info.flatlist.clear();
@@ -114,25 +122,34 @@ void ofxSVG::parseXML(string xml){
 	setupDiagram(diagram);
     
 	svgtiny_free(diagram);
-
+    
+    //Check if path to complex. Simplify if so.
+    
+    for(int i = 0; i < paths.size(); i++){
+        if(paths[i]->getCommands().size()>complexityThreshold){
+            paths[i]->simplify(.3);
+            ofLogWarning()<<"ofxSVG too complex for tesselator, it was simplified. Cmd size: "<<paths[i]->getCommands().size()<<endl;
+        }
+    }
 }
 
 void ofxSVG::draw(){
     
     ofPushMatrix();
     ofTranslate(x,y);
+    
 	for(int i = 0; i < paths.size(); i++){
-		paths[i]->draw();
-	}
+        paths[i]->draw();
+ 	}
     ofPopMatrix();
 }
 
 
 void ofxSVG::setupDiagram(struct svgtiny_diagram * diagram){
-
+    
 	width = diagram->width;
 	height = diagram->height;
-
+    
 	for(int i = 0; i < diagram->shape_count; i++){
 		if(diagram->shape[i].path){
 			setupShape(&diagram->shape[i]);
@@ -145,22 +162,22 @@ void ofxSVG::setupDiagram(struct svgtiny_diagram * diagram){
 
 void ofxSVG::setupShape(struct svgtiny_shape * shape){
 	float * p = shape->path;
-
+    
 	ofPath * path = new ofPath();
 	paths.push_back(ofPathRef(path));
-
+    
 	path->setFilled(false);
-
+    
 	if(shape->fill != svgtiny_TRANSPARENT){
 		path->setFilled(true);
 		path->setFillHexColor(shape->fill);
 	}
-
+    
 	if(shape->stroke != svgtiny_TRANSPARENT){
 		path->setStrokeWidth(shape->stroke_width);
 		path->setStrokeHexColor(shape->stroke);
 	}
-
+    
 	for(int i = 0; i < shape->path_length;){
 		if(p[i] == svgtiny_PATH_MOVE){
 			path->moveTo(p[i + 1], p[i + 2]);
@@ -168,7 +185,7 @@ void ofxSVG::setupShape(struct svgtiny_shape * shape){
 		}
 		else if(p[i] == svgtiny_PATH_CLOSE){
 			path->close();
-
+            
 			i += 1;
 		}
 		else if(p[i] == svgtiny_PATH_LINE){
@@ -207,7 +224,7 @@ void ofxSVG::setFilled(bool t){
         }
     }
     isFilled = t;
-   // ofLog()<<"setFilled "<<t<<"  " <<paths.size()<<endl;
+    // ofLog()<<"setFilled "<<t<<"  " <<paths.size()<<endl;
     
 };
 
@@ -226,7 +243,7 @@ void ofxSVG::setFilled(bool t,int path){
     }
     
     //ofLog()<<"setFilled path"<<t<<"  " <<path<<endl;
-
+    
 };
 
 
@@ -244,7 +261,7 @@ void ofxSVG::setFillColor(ofColor col){
         //info.flatlist[i]->path.fill_opacity = ofToString((float) col.a/255.0);
     }
     fill = col;
-   // ofLog()<<"setFillColor"<<endl;
+    // ofLog()<<"setFillColor"<<endl;
 };
 
 
@@ -260,11 +277,11 @@ void ofxSVG::setFillColor(ofColor col,int path){
     setSVGattribute(info.flatlist[path],"fill_opacity",ofToString((float) col.a/255.0));
     
     
- //  ofLog()<<"setFillColor path"<<"  " <<path<<" "<<ofToString(hexToWeb(col))<<" info.flatlist.size()  "<<info.flatlist.size()<< " paths.size() "<<paths.size()<<endl;
+    //  ofLog()<<"setFillColor path"<<"  " <<path<<" "<<ofToString(hexToWeb(col))<<" info.flatlist.size()  "<<info.flatlist.size()<< " paths.size() "<<paths.size()<<endl;
     
     
     //info.flatlist[path]->path.fill = hexToWeb(col);
-   // info.flatlist[path]->path.fill_opacity = ofToString((float) col.a/255.0);
+    // info.flatlist[path]->path.fill_opacity = ofToString((float) col.a/255.0);
     
 };
 
@@ -272,17 +289,17 @@ void ofxSVG::setFillColor(ofColor col,int path){
 
 
 void ofxSVG::setStrokeWidth(float f){
-   // ofLog()<<"setStrokeWidth info.flatlist.size "<< info.flatlist.size()<<" paths.size() "<<paths.size()<<endl;
+    // ofLog()<<"setStrokeWidth info.flatlist.size "<< info.flatlist.size()<<" paths.size() "<<paths.size()<<endl;
     
     
     for(int i=0;i<paths.size();i++){
         paths[i]->setStrokeWidth(f);
         //borg...update DOM...make sure you cast correctly as flatlist is using ofPtr...and xcode doesn't tell you float is not string
-       
-           //info.flatlist[i]->path.stroke_width = ofToString(f);
-            setSVGattribute(info.flatlist[i],"stroke_width",ofToString(f));
-       
-
+        
+        //info.flatlist[i]->path.stroke_width = ofToString(f);
+        setSVGattribute(info.flatlist[i],"stroke_width",ofToString(f));
+        
+        
     }
     
     strokeWidth = f;
@@ -290,7 +307,7 @@ void ofxSVG::setStrokeWidth(float f){
 void ofxSVG::setStrokeColor(ofColor col){
     for(int i=0;i<paths.size();i++){
         paths[i]->setStrokeColor(col);
-        //borg...update DOM 
+        //borg...update DOM
         setSVGattribute(info.flatlist[i],"stroke",hexToWeb(col));
         setSVGattribute(info.flatlist[i],"stroke_opacity",ofToString((float) col.a/255.0));
         //info.flatlist[i]->path.stroke = ofToString(hexToWeb(col));
@@ -320,13 +337,44 @@ ofColor ofxSVG::getStrokeColor(){
 
 
 /*
- I wish there was a C++ equivalent of the AS3 this["attr"] syntax. 
- 
+ I wish there was a C++ equivalent of the AS3 this["attr"] syntax.
+ Clever ways of mapping this welcomed.
  */
 
 
 void ofxSVG::setSVGattribute(ofPtr<svgNode>  node,string attribute, string value){
     switch (node->type){
+        case SVG_TAG_TYPE_CIRCLE:
+            if(attribute == "cx"){
+                node->circle.cx = value;
+            }
+            if(attribute == "cy"){
+                node->circle.cy = value;
+            }
+            if(attribute == "fill"){
+                node->circle.fill = value;
+            }
+            if(attribute == "stroke_width"){
+                node->circle.stroke_width = value;
+            }
+            if(attribute == "stroke"){
+                node->circle.stroke = value;
+            }
+            if(attribute == "r"){
+                node->circle.r = value;
+            }
+            
+            if(attribute == "stroke_width"){
+                node->circle.stroke_width = value;
+            }
+            if(attribute == "stroke_opacity"){
+                node->circle.stroke_opacity = value;
+            }
+            if(attribute == "fill_opacity"){
+                node->circle.fill_opacity = value;
+            }
+            
+            break;
         case SVG_TAG_TYPE_RECT:
             if(attribute == "x"){
                 node->rect.x = value;
@@ -417,9 +465,14 @@ void ofxSVG::setSVGattribute(ofPtr<svgNode>  node,string attribute, string value
                 node->group.fill_opacity = value;
             }
             break;
+        case SVG_TAG_TYPE_SVG:
+            break;
+        case SVG_TAG_TYPE_DOCUMENT:
+            break;
+
     }
-            
-            
+    
+    
 }
 
 void ofxSVG::setStrokeWidth(float f,int path){
@@ -429,7 +482,7 @@ void ofxSVG::setStrokeWidth(float f,int path){
     }
     paths[path]->setStrokeWidth(f);
     setSVGattribute(info.flatlist[path],"stroke_width",ofToString(f));
-
+    
 };
 
 void ofxSVG::setStrokeColor(ofColor col,int path){
@@ -438,7 +491,7 @@ void ofxSVG::setStrokeColor(ofColor col,int path){
         return;
     }
     paths[path]->setStrokeColor(col);
-    //borg...update DOM 
+    //borg...update DOM
     setSVGattribute(info.flatlist[path],"stroke",hexToWeb(col));
     setSVGattribute(info.flatlist[path],"stroke_opacity",ofToString((float) col.a/255.0));
     
@@ -477,6 +530,285 @@ ofColor ofxSVG::getStrokeColor(int path){
     return paths[path]->getStrokeColor();
 };
 /*
+ From 08 ofPath has no subpaths but use Commands.
+ Translate them into SVG XML nodes and append them to the document
+ 
+ enum Type{
+ moveTo,
+ lineTo,
+ curveTo,
+ bezierTo,
+ quadBezierTo,
+ arc,
+ arcNegative,
+ close
+ };
+ 
+ 
+ Upper/lower case in d attrib refer to abs/relative position, eg. M/m
+ 
+ A Bézier curve with one control point is called a quadratic Bézier curve and the kind with two control points is called cubic.
+ 
+ Why this?!
+ void ofPath::quadBezierTo(const ofPoint & cp1, const ofPoint & cp2, const ofPoint & p)
+ */
+
+
+void ofxSVG::addPath(ofPath &path,bool inNewGroup){
+    
+    string rawXMLstring =  toString();
+    
+    Document * document;
+    DOMParser parser;
+    parser.setFeature(Poco::XML::XMLReader::FEATURE_NAMESPACE_PREFIXES, false);
+    parser.setFeature(Poco::XML::XMLReader::FEATURE_NAMESPACES, false);
+    
+    
+    document = parser.parseString(rawXMLstring);
+    
+    //TODO: Check if has nodes else create new
+    //Document *document = new Document();
+    //parseHeader(document);
+    
+    
+    
+    
+    //ofPtr<svgNode> childnode(new svgNode());
+    //childnode->type = SVG_TAG_TYPE_PATH;
+    
+    
+    //<path style=" stroke:none;fill-rule:nonzero;fill:rgb(0%,0%,0%);fill-opacity:1;" d="M 245.8125 37 C 245.8125 43.414062 236.1875 43.414062 236.1875 37 C 236.1875 30.585938 245.8125 30.585938 245.8125 37 Z M 245.8125 37 "/>
+    
+
+    
+    Element *pathElement = parsePath(path,document);
+    
+    
+    
+    ChildNodesList *cnl = (ChildNodesList *) document->childNodes();
+    
+    
+    //go inside root
+    Element *root = (Element *) cnl->item(0);
+    
+    if(inNewGroup){
+        Element *groupElement = document->createElement("g");
+        groupElement->setAttribute("id",ofGetTimestampString());
+        groupElement->appendChild(pathElement);
+        root->appendChild(groupElement);
+    }else{
+        root->appendChild(pathElement);
+    }
+    
+    
+    DOMWriter writer;
+    stringstream xmlstream;
+    writer.setNewLine("\n");
+    writer.setOptions(XMLWriter::PRETTY_PRINT);
+    writer.writeNode(xmlstream, document);
+    
+    
+
+    parseXML(xmlstream.str());
+    
+};
+
+void ofxSVG::addPaths(vector<ofPath> &paths,bool inNewGroup){
+
+    
+    string rawXMLstring =  toString();
+    
+    Document * document;
+    DOMParser parser;
+    parser.setFeature(Poco::XML::XMLReader::FEATURE_NAMESPACE_PREFIXES, false);
+    parser.setFeature(Poco::XML::XMLReader::FEATURE_NAMESPACES, false);
+    
+    
+    document = parser.parseString(rawXMLstring);
+    
+    ChildNodesList *cnl = (ChildNodesList *) document->childNodes();
+    
+    //go inside root
+    Element *root = (Element *) cnl->item(0);
+    
+    
+    
+    Element * appendElement;
+    if(inNewGroup){
+        appendElement = document->createElement("g");
+        appendElement->setAttribute("id",ofGetTimestampString());
+    }else{
+        appendElement = root;
+    }
+    
+    for(int i=0;i<paths.size();i++){
+        Element *pathElement = parsePath(paths[i],document);
+        appendElement->appendChild(pathElement);
+    }
+    
+    
+    if(inNewGroup){
+        root->appendChild(appendElement);
+    }
+    
+
+    
+    DOMWriter writer;
+    stringstream xmlstream;
+    writer.setNewLine("\n");
+    writer.setOptions(XMLWriter::PRETTY_PRINT);
+    writer.writeNode(xmlstream, document);
+    
+    
+    
+    parseXML(xmlstream.str());
+};
+
+
+Element *ofxSVG::parsePath(ofPath path,Document * document){
+    Element *pathElement;;
+    
+    string d="";
+    
+    for(ofPath::Command com:path.getCommands()){
+        
+        //ofPath::Command::Type
+        int t = com.type;
+        switch (t){
+            case 0:{
+                //moveTo
+                d+= " M"+ ofToString(com.to.x)+","+ofToString(com.to.y);
+                pathElement = document->createElement("path");
+                pathElement->setAttribute("d",d);
+                break;
+            }
+            case 1:{
+                //lineTo
+                d+= " L"+ ofToString(com.to.x)+","+ofToString(com.to.y);
+                pathElement = document->createElement("path");
+                pathElement->setAttribute("d",d);
+                break;
+            }
+            case 2:{
+                //curveTo
+                //TODO: THIS IS WRONG BUT OF IMPLEMENTS curveTo in an odd way as it's only asking for ONE point - which?
+                ofLogWarning()<<"curveTo to SVG not implemented"<<endl;
+                d+= " Q"+ofToString(com.cp1.x)+","+ofToString(com.cp1.y)+" "+ ofToString(com.to.x)+","+ofToString(com.to.y);
+                pathElement = document->createElement("path");
+                pathElement->setAttribute("d",d);
+                break;
+            }
+            case 3:{
+                //bezierTo
+                //SVG C is cubic bezier
+                d+= " C"+ofToString(com.cp1.x)+","+ofToString(com.cp1.y)+" "+ofToString(com.cp2.x)+","+ofToString(com.cp2.y)+" "+ ofToString(com.to.x)+","+ofToString(com.to.y);
+                pathElement = document->createElement("path");
+                pathElement->setAttribute("d",d);
+                break;
+            }
+            case 4:{
+                //quadBezierTo
+                //SVG Q is quadratic bezier
+                d+= " Q"+ofToString(com.cp1.x)+","+ofToString(com.cp1.y)+" "+ ofToString(com.to.x)+","+ofToString(com.to.y);
+                pathElement = document->createElement("path");
+                pathElement->setAttribute("d",d);
+                break;
+            }
+            case 5:{
+                //arc
+                
+                
+                if((com.angleEnd - com.angleBegin)<360){
+                    ofLogWarning()<<"arc to SVG not properly implemented"<<endl;
+                    d+= " A"+ofToString(com.radiusX)+","+ofToString(com.radiusY)+" "+ ofToString(com.angleBegin)+" 1,0 "+ofToString(com.to.x) +","+ofToString(com.to.y);
+                    
+                    
+                    
+                    pathElement = document->createElement("path");
+                    pathElement->setAttribute("d",d);
+                }else{
+                    
+                    /*
+                     <circle cx="100" cy="50" r="40" stroke="black"
+                     stroke-width="2" fill="red"/>
+                     */
+                    
+                    
+                    //com.radiusX == com.radiusY
+                    
+                    
+                    pathElement = document->createElement("circle");
+                    pathElement->setAttribute("cx",ofToString(com.to.x));
+                    pathElement->setAttribute("cy",ofToString(com.to.y));
+                    pathElement->setAttribute("r",ofToString(com.radiusX));
+                    
+                }
+                
+                
+                /*
+                 rx ry x-axis-rotation large-arc-flag sweep-flag x y
+                 */
+                //TODO: Not tested
+                //SVG Q is quadratic bezier
+                
+                
+                
+                
+                break;
+            }
+            case 6:{
+                //arcNegative
+                break;
+            }
+            case 7:{
+                //close
+                d+= " Z ";
+                pathElement = document->createElement("path");
+                pathElement->setAttribute("d",d);
+                break;
+            }
+        }
+    }
+    
+    
+    
+    
+    
+    string style="";
+    if(path.isFilled()){
+        pathElement->setAttribute("fill",hexToWeb(path.getFillColor()));
+        pathElement->setAttribute("fill-opacity",ofToString(path.getFillColor().a/255.0f));
+    }else{
+        pathElement->setAttribute("fill","none");
+        
+    }
+    
+    
+    
+    if(true){
+        //ever not the case?
+        pathElement->setAttribute("stroke",hexToWeb(path.getStrokeColor()));
+        pathElement->setAttribute("stroke-width",ofToString(path.getStrokeWidth()));
+        
+        pathElement->setAttribute("stroke-opacity",ofToString(path.getStrokeColor().a/255.0f));
+        
+        
+        if(path.getStrokeWidth()>0.1){
+            pathElement->setAttribute("stroke-width",ofToString(path.getStrokeWidth()));
+        }else{
+            pathElement->setAttribute("stroke-width","1.0");
+        }
+        
+    }else{
+        pathElement->setAttribute("stroke","none");
+        
+    }
+    
+    return pathElement;
+};
+
+
+/*
  
  Trouble with insert is that it probably removes the original from the previous vector
  http://stackoverflow.com/questions/4122789/copy-object-keep-polymorphism/4122835#4122835
@@ -489,28 +821,28 @@ ofColor ofxSVG::getStrokeColor(int path){
  
  */
 void ofxSVG::merge(ofxSVG & svg){
-         //copy children
-        ofPtr<svgNode> childnode(new svgNode());
-        svgGroupDef gDef;
-        gDef.transform = "translate("+ofToString(svg.getX())+","+ofToString(svg.getY())+")";
- 
-        childnode->group = gDef;  
-        childnode->type =SVG_TAG_TYPE_GROUP;
-        
-
-        
-        childnode->children = svg.info.rootnode->children;
-        info.rootnode->children.push_back(childnode);
-        
-        /*
-         reparsing of the whole svg. If correct then all paths etc will be updated.
-         */
-        
-        string str = toString();
-        parseXML(str);
-
-   
-
+    //copy children
+    ofPtr<svgNode> childnode(new svgNode());
+    svgGroupDef gDef;
+    gDef.transform = "translate("+ofToString(svg.getX())+","+ofToString(svg.getY())+")";
+    
+    childnode->group = gDef;
+    childnode->type =SVG_TAG_TYPE_GROUP;
+    
+    
+    
+    childnode->children = svg.info.rootnode->children;
+    info.rootnode->children.push_back(childnode);
+    
+    /*
+     reparsing of the whole svg. If correct then all paths etc will be updated.
+     */
+    
+    string str = toString();
+    parseXML(str);
+    
+    
+    
 };
 
 /*
@@ -521,6 +853,11 @@ void ofxSVG::merge(ofxSVG & svg){
 void ofxSVG::setPos(int _x, int _y){
     x = _x;
     y = _y;
+};
+
+void  ofxSVG::setPos(ofPoint pt){
+    x = pt.x;
+    y = pt.y;
 };
 
 int ofxSVG::getX(){
@@ -553,6 +890,10 @@ int ofxSVG::getHeight(){
 
 void ofxSVG::setViewbox(int x, int y,int w, int h){
     info.viewbox = ofToString(x)+" " +ofToString(y) +" " +ofToString(w)+" " +ofToString(h);
+    info.y = ofToString(y) +"px";
+    info.x = ofToString(x) +"px";
+    info.width = ofToString(w) +"px";
+    info.height = ofToString(h) +"px";
 };
 
 void ofxSVG::save(string file){
@@ -563,14 +904,14 @@ void ofxSVG::save(string file){
      Wrong DOCTTYPE upsets illustrator. Adviced to leave out.
      
      */
-
-
-    Document *document = new Document();    
+    
+    
+    Document *document = new Document();
     parseHeader(document);
-        
+    
 	//DOMParser parser;
     //parser.setFeature(Poco::XML::XMLReader::FEATURE_NAMESPACES, false);
-   
+    
     //document = parser.parseString(info.rawXML);
     //svg = document->documentElement();
     
@@ -580,30 +921,47 @@ void ofxSVG::save(string file){
     
     DOMWriter writer;
     
-
+    
     /*
      BORG
      remove unwanted namespace ns1
      this doesn't actually work for some reason.
-          
+     
      writer.writeNode(xmlstream, svg);
      string rawXMLstring = xmlstream.str();
-
-    Poco::XML::Document * cleanDocument;
-    Poco::XML::DOMParser parser;
-    parser.setFeature(Poco::XML::XMLReader::FEATURE_NAMESPACE_PREFIXES, false);
-    parser.setFeature(Poco::XML::XMLReader::FEATURE_NAMESPACES, false);
-       
-    cleanDocument = parser.parseString(rawXMLstring);
-
-      */
+     
+     Poco::XML::Document * cleanDocument;
+     Poco::XML::DOMParser parser;
+     parser.setFeature(Poco::XML::XMLReader::FEATURE_NAMESPACE_PREFIXES, false);
+     parser.setFeature(Poco::XML::XMLReader::FEATURE_NAMESPACES, false);
+     
+     cleanDocument = parser.parseString(rawXMLstring);
+     
+     */
+    
+    
+    
+    
+    
+    /*
+     
+     #if defined(TARGET_OF_IPHONE)
+     //equivalent of
+     //ofxiPhoneGetDocumentsDirectory();
+     string dataPath = "../Documents/";
+     
+     #else
+     string dataPath = ofToDataPath("");
+     #endif
+     
+     
+     */
     string fullXmlFile;
-   /* if(OF_TARGET_IPHONE){
-    //how to use. Fix to make compatible with ios directly
-        fullXmlFile = ofToDataPath("../Documents/"+file);
-    }else{*/
-        fullXmlFile = ofToDataPath(file);
-  //  }
+    /* if(OF_TARGET_IPHONE){
+         fullXmlFile = ofToDataPath("../Documents/"+file);
+     }else{*/
+         fullXmlFile = ofToDataPath(file);
+      //}
     writer.setNewLine("\n");
     writer.setOptions(XMLWriter::PRETTY_PRINT);
     writer.writeNode(fullXmlFile, document);
@@ -611,7 +969,7 @@ void ofxSVG::save(string file){
 }
 
 
-string ofxSVG::toString(){    
+string ofxSVG::toString(){
     Document *document = new Document();
     
     parseHeader(document);
@@ -624,6 +982,144 @@ string ofxSVG::toString(){
     return xmlstream.str();
     
 }
+
+
+ofImage ofxSVG::getImage(int MSAA){
+    
+    MSAA = MIN(MSAA,4);
+    int tw = getWidth()*MSAA;
+    int th = getHeight()*MSAA;
+        
+    //adapt to max texture limit supported on device
+    int max;
+    glGetIntegerv(GL_MAX_TEXTURE_SIZE, &max);
+    
+    float MSAAcomp = 1.0f;
+    
+    if(tw>max && tw>th){
+        MSAAcomp = max/(float)tw;
+    }else if(th>max){
+        MSAAcomp = max/(float)th;
+    }
+    
+    tw*=MSAAcomp;
+    th*=MSAAcomp;
+    
+    
+    ofFbo fbo;
+    ofImage img;
+
+    
+    fbo.allocate(tw, th,GL_RGBA);
+    
+
+    
+    ofPushStyle();
+    fbo.begin();
+    ofClear(255, 0);
+    ofEnableAlphaBlending();
+    //ofBackground(bgColour);
+    ofSetColor(255);
+    ofScale(MSAA*MSAAcomp,MSAA*MSAAcomp);
+    draw();
+    
+    
+    fbo.end();
+    ofPopStyle();
+    
+    
+    
+    ofPixels pixels;
+    fbo.readToPixels(pixels);
+    img.setFromPixels(pixels.getPixels(), fbo.getWidth(),fbo.getHeight(), OF_IMAGE_COLOR_ALPHA);
+    
+    if(MSAA>1){
+        img.resize(getWidth(),getHeight());
+    }
+    return img;
+    
+
+};
+
+
+
+ofImage ofxSVG::getImage(int w, int h,ofColor bg,int MSAA){
+    cout<<"ofxSVG::getImage "<<w<<"x"<<h<<endl;
+    MSAA = MIN(MSAA,4);
+    
+    //GL_MAX_TEXTURE_SIZE 4096
+ 
+    
+    int tw = w*MSAA;
+    int th = h*MSAA;
+    
+    
+    //adapt to max texture limit supported on device
+    int max;
+    glGetIntegerv(GL_MAX_TEXTURE_SIZE, &max);
+    
+    float MSAAcomp = 1.0f;
+    
+    if(tw>max && tw>th){
+        MSAAcomp = max/(float)tw;
+    }else if(th>max){
+        MSAAcomp = max/(float)th;
+    }
+    
+    tw*=MSAAcomp;
+    th*=MSAAcomp;
+    
+    
+    
+    float sx = (float)w/(float)getWidth();
+    float sy = (float)h/(float)getHeight();
+    ofImage img;
+    img.allocate(w, h,OF_IMAGE_COLOR);
+    ofFbo fbo;
+
+
+    fbo.allocate(tw, th,GL_RGBA);
+
+
+    if(!fbo.isAllocated()){
+        ofLogError()<<"ofxSVG::getImage not even allocated tw, th "<<tw<<", "<<th<<endl;
+    }
+    
+    ofPushStyle();
+    fbo.begin();
+    ofClear(255, 0);
+    ofEnableAlphaBlending();
+    ofBackground(bg);
+    ofSetColor(255);
+    ofScale(MSAA*MSAAcomp*sx,MSAA*MSAAcomp*sy);
+    draw();
+    fbo.end();
+    ofPopStyle();
+    
+    
+    
+    ofPixels pixels;
+    fbo.readToPixels(pixels);
+    
+    if(pixels.getPixels()){
+        img.setFromPixels(pixels.getPixels(), fbo.getWidth(),fbo.getHeight(), OF_IMAGE_COLOR_ALPHA);
+       // ok = true;
+    }else{
+        ofLogError()<<"ofImage ofxSVG::getImage pixels.getPixels() returning null."<<endl;
+    
+    }
+    if(MSAA>1){
+        img.resize(w,h);
+    }
+    
+
+
+    return img;
+    
+    
+};
+
+
 
 void ofxSVG::parseHeader(Document * document){
     
@@ -662,6 +1158,9 @@ void ofxSVG::parseHeader(Document * document){
         
     }
     
+    
+    //<!-- Generator: VectorSNAP  -->
+    
     // ofLog()<<"info.preserveAspectRatio "<<info.preserveAspectRatio<<endl;
     //svg->setAttribute("xml:space",info.xml_space);
     //svg->setAttribute("xmlns",info.xmlns);
@@ -676,9 +1175,9 @@ void ofxSVG::parseHeader(Document * document){
     }else{
         ofLog()<<"check info.rootnode health"<<endl;
     }
-       
     
-
+    
+    
     
 };
 
@@ -692,6 +1191,36 @@ Element * ofxSVG::parseNode(Document *doc,ofPtr<svgNode> node){
     
     Element * newNode;
     switch (node->type){
+        case SVG_TAG_TYPE_CIRCLE:
+            newNode = doc->createElement("circle");
+            // ofLog()<<"node->path.fill "<<node->path.fill<<endl;
+            if(!node->circle.cx.empty()){
+                newNode->setAttribute("cx",node->circle.cx);
+            }
+            if(!node->circle.cy.empty()){
+                newNode->setAttribute("cy",node->circle.cy);
+            }
+            if(!node->circle.r.empty()){
+                newNode->setAttribute("r",node->circle.r);
+            }
+            
+            if(!node->circle.fill.empty()){
+                newNode->setAttribute("fill",node->circle.fill);
+            }
+            if(!node->circle.stroke.empty()){
+                newNode->setAttribute("stroke",node->circle.stroke);
+            }
+            
+            if(!node->circle.stroke_width.empty()){
+                newNode->setAttribute("stroke-width",node->circle.stroke_width);
+            }
+            if(!node->circle.fill_opacity.empty()){
+                newNode->setAttribute("fill-opacity",node->circle.fill_opacity);
+            }
+            if(!node->circle.stroke_opacity.empty()){
+                newNode->setAttribute("stroke-opacity",node->circle.stroke_opacity);
+            }
+            break;
         case SVG_TAG_TYPE_RECT:
             newNode = doc->createElement("rect");
             // ofLog()<<"node->path.fill "<<node->path.fill<<endl;
@@ -750,7 +1279,7 @@ Element * ofxSVG::parseNode(Document *doc,ofPtr<svgNode> node){
             }
             break;
         case SVG_TAG_TYPE_GROUP:
-           // ofLog()<<"SVG_TAG_TYPE_GROUP"<<endl;
+            // ofLog()<<"SVG_TAG_TYPE_GROUP"<<endl;
             newNode = doc->createElement("g");
             if(!node->group.transform.empty()){
                 newNode->setAttribute("transform",node->group.transform);
@@ -771,11 +1300,11 @@ Element * ofxSVG::parseNode(Document *doc,ofPtr<svgNode> node){
                 newNode->setAttribute("fill-opacity",node->group.fill_opacity);
             }
             if(!node->group.stroke_opacity.empty()){
-                newNode->setAttribute("stroke-opacity",node->group.stroke_opacity);  
+                newNode->setAttribute("stroke-opacity",node->group.stroke_opacity);
             }
             break;
         case SVG_TAG_TYPE_SVG:
-           // ofLog()<<"SVG_TAG_TYPE_SVG"<<endl;
+            // ofLog()<<"SVG_TAG_TYPE_SVG"<<endl;
             newNode = doc->createElement("svg");
             newNode->setAttribute("x",node->svg.x);
             newNode->setAttribute("y",node->svg.y);
@@ -785,21 +1314,21 @@ Element * ofxSVG::parseNode(Document *doc,ofPtr<svgNode> node){
                 newNode->setAttribute("enable-background",node->svg.enable_background);
             }
             
-           // newNode->setAttribute("viewBox",node->svg.viewbox);
+            // newNode->setAttribute("viewBox",node->svg.viewbox);
             break;
         case SVG_TAG_TYPE_DOCUMENT:
             //ofLog()<<"SVG_TAG_TYPE_DOCUMENT"<<endl;
             //we are ignoring nested svg attributes ...its just that the doc root is xml root...and stuff....whatever
             return 0;
             /*
-            newNode = doc->createElement("svg");
-            newNode->setAttribute("x",node->svg.x);
-            newNode->setAttribute("y",node->svg.y);
-            newNode->setAttribute("width",node->svg.width);
-            newNode->setAttribute("height",node->svg.height);
-            if(!node->svg.enable_background.empty()){
-                newNode->setAttribute("enable-background",node->svg.enable_background);
-            }
+             newNode = doc->createElement("svg");
+             newNode->setAttribute("x",node->svg.x);
+             newNode->setAttribute("y",node->svg.y);
+             newNode->setAttribute("width",node->svg.width);
+             newNode->setAttribute("height",node->svg.height);
+             if(!node->svg.enable_background.empty()){
+             newNode->setAttribute("enable-background",node->svg.enable_background);
+             }
              */
             break;
             
@@ -807,7 +1336,7 @@ Element * ofxSVG::parseNode(Document *doc,ofPtr<svgNode> node){
     return newNode;
 };
 
-void ofxSVG::xmlCreateSVG(Document *doc,Element *extNode, ofPtr<svgNode> intNode){    
+void ofxSVG::xmlCreateSVG(Document *doc,Element *extNode, ofPtr<svgNode> intNode){
     Element * newNode = parseNode(doc,intNode);
     if(newNode!=0){
         extNode->appendChild(newNode);
@@ -821,12 +1350,120 @@ void ofxSVG::xmlCreateSVG(Document *doc,Element *extNode, ofPtr<svgNode> intNode
             xmlCreateSVG(doc,extNode,intNode->children[i]);
         }
     }
-        
-   
-
+    
+    
+    
 };
 
+/////////LOGICAL OPERATIONS
 
-
-
-
+//return a vector of ofPolylines...I wish I could convert directly to
+//svg but would need to port cairos subPath to SVG renderer to do so
+//cairo not supported on iOS
+/*
+ 
+ ofPolylinesRef ofxSVG::logicalIntersection(ofxSVG & svg){
+ //ofxSVGRef newSVG(new ofxSVG());
+ generateClipper(this,&svg);
+ // execute the clipping operation based on the current clipping type
+ clipper.clip(OFX_CLIPPER_INTERSECTION,clips);
+ 
+ ofPolylinesRef polyRef(new vector<ofPolyline>);
+ 
+ for(int i=0;i<clips.size();i++){
+ polyRef->push_back(clips[i]);
+ }
+ 
+ return polyRef;
+ };
+ 
+ ofPolylinesRef ofxSVG::logicalDifference(ofxSVG & svg){
+ //ofxSVGRef newSVG(new ofxSVG());
+ generateClipper(this,&svg);
+ // execute the clipping operation based on the current clipping type
+ clipper.clip(OFX_CLIPPER_DIFFERENCE,clips);
+ 
+ ofPolylinesRef polyRef(new vector<ofPolyline>);
+ 
+ for(int i=0;i<clips.size();i++){
+ polyRef->push_back(clips[i]);
+ }
+ 
+ return polyRef;
+ 
+ };
+ 
+ ofPolylinesRef ofxSVG::logicalUnion(ofxSVG & svg){
+ //ofxSVGRef newSVG(new ofxSVG());
+ generateClipper(this,&svg);
+ // execute the clipping operation based on the current clipping type
+ clipper.clip(OFX_CLIPPER_UNION,clips);
+ 
+ ofPolylinesRef polyRef(new vector<ofPolyline>);
+ 
+ for(int i=0;i<clips.size();i++){
+ polyRef->push_back(clips[i]);
+ }
+ 
+ return polyRef;
+ };
+ 
+ ofPolylinesRef ofxSVG::logicalXor(ofxSVG & svg){
+ //ofxSVGRef newSVG(new ofxSVG());
+ generateClipper(this,&svg);
+ // execute the clipping operation based on the current clipping type
+ clipper.clip(OFX_CLIPPER_XOR,clips);
+ 
+ ofPolylinesRef polyRef(new vector<ofPolyline>);
+ 
+ for(int i=0;i<clips.size();i++){
+ polyRef->push_back(clips[i]);
+ }
+ 
+ return polyRef;
+ 
+ };
+ 
+ 
+ void ofxSVG::generateClipper(ofxSVG * src,ofxSVG * clip){
+ clips.clear();
+ clipSubjects.clear();
+ clipMasks.clear();
+ clipper.clear();
+ 
+ ofPoint pt;
+ pt.set(src->getX(),src->getY());
+ 
+ ofPath op;
+ vector<ofPolyline> vp;
+ for(int i=0;i<src->getNumPath();i++){
+ op = src->getPathAt(i);
+ op.translate(pt);
+ vp = op.getOutline();
+ 
+ clipSubjects.insert(clipSubjects.end(), vp.begin(), vp.end());
+ 
+ }
+ 
+ // add the clipper subjects (i.e. the things that will be clipped)
+ clipper.addPolylines(clipSubjects,OFX_CLIPPER_SUBJECT);
+ 
+ 
+ pt.set(clip->getX(),clip->getY());
+ for(int i=0;i<clip->getNumPath();i++){
+ op = clip->getPathAt(i);
+ op.translate(pt);
+ vp = op.getOutline();
+ 
+ clipMasks.insert(clipMasks.end(), vp.begin(), vp.end());
+ 
+ }
+ 
+ 
+ 
+ // add the clipper masks (i.e. the things that will do the clipping)
+ clipper.addPolylines(clipMasks,OFX_CLIPPER_CLIP);
+ 
+ };
+ 
+ */

@@ -17,6 +17,7 @@
 
 struct svgNode;
 typedef  enum SVG_TAG_TYPE{
+    SVG_TAG_TYPE_CIRCLE,
     SVG_TAG_TYPE_RECT,
     SVG_TAG_TYPE_PATH,
     SVG_TAG_TYPE_GROUP,
@@ -29,6 +30,18 @@ typedef  enum SVG_TAG_TYPE{
  TODO: COMPLETE THESE FOR ALL FORMS CIRCLE, ELLIPSE etc....
  
  */
+typedef struct svgCircleDef{
+    string fill;
+    string stroke;
+    string fill_opacity;//float 0-1
+    string stroke_opacity;//float 0-1
+    string stroke_width;
+    string cx;
+    string cy;
+    string r;
+}svgCircleDef;
+
+
 typedef struct svgPathDef{
     string fill;
     string stroke;
@@ -82,6 +95,7 @@ typedef struct svgNode{
     svgGroupDef group;
     svgPathDef path;
     svgRectDef rect;
+    svgCircleDef circle;
     vector<ofPtr<svgNode> >children;//
     SVG_TAG_TYPE type;
 }svgNode;
