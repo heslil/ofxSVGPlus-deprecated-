@@ -1,3 +1,18 @@
+
+Heslil Inc.:
+Several authors have worked on the code before the last fork, need to:
+
+1. clean up the copyright notices, and the license file, or files? probably all is mit?
+2. style them according to the of style guide
+3. get rid of ofmain.h
+
+and add these:
+
+1. scaling
+2. catching exceptions in the addon
+
+-------
+
 SVG rendering in oF comes in many shapes, as well as saving vector graphics from your app.
 
 ofxSvg is a rewrite by Joshua Noble of ofxSVGTiny (satoruhiga). However, they only read and translate SVGs into native ofPaths. They do not support changing colours, stroke weight, merging or saving out. Since you can do a lot of those things in desktop environment with Cairo you may not need it, but if you want to save out on iOS you need something like my additions since  Cairo is not yet (AFAIK) supported on iOS. 
